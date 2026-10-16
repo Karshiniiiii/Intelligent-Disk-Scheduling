@@ -3,6 +3,7 @@ from cache import LRUCache
 from predictor import FrequencyPredictor
 from request_generator import generate_random_requests, generate_patterned_requests
 from intelligent_scheduler import ALGORITHMS, run_intelligent
+from integrated_scheduler import compare_modes
 
 
 def read_int(prompt, minimum=None, default=None):
@@ -69,16 +70,50 @@ def test_cache(trace, capacity=4):
     print(f"Correct predicted preloads used: {cache.prediction_hits}; predictions missed: {predictor.predictions - predictor.correct_predictions}")
 
 
+DISPLAY_NAMES = {
+    "Plain SSTF (no cache)": "Plain SSTF (no cache)",
+    "SSTF + LRU cache": "SSTF + LRU Cache",
+    "SSTF + LRU cache + prediction": "SSTF + LRU Cache + Prediction",
+}
+
+
+def show_integrated_comparison():
+    results = compare_modes()
+    best_key = min(results, key=lambda key: results[key]["total_head_movement"])
+    plain_movement = results["Plain SSTF (no cache)"]["total_head_movement"]
+    best_movement = results[best_key]["total_head_movement"]
+    best_seeks_avoided = results[best_key]["seeks_avoided"]
+    reduction = (plain_movement - best_movement) / plain_movement * 100 if plain_movement else 0.0
+
+    print("\n" + "=" * 60)
+    print("INTELLIGENT DISK SCHEDULING - RESULTS COMPARISON")
+    print("=" * 60)
+    print(f"\n{'Mode':<30}{'Head Movement':>15}{'Cache Hit Rate':>17}{'Seeks Avoided':>15}")
+    print("-" * 75)
+    for key, result in results.items():
+        print(
+            f"{DISPLAY_NAMES[key]:<30}{result['total_head_movement']:>15d}"
+            f"{result['hit_rate'] * 100:>16.2f}%{result['seeks_avoided']:>15d}"
+        )
+
+    print(f"\nBest mode: {DISPLAY_NAMES[best_key]}")
+    print(f"Seeks avoided vs plain SSTF: {best_seeks_avoided} ({reduction:.1f}% reduction in disk movement)")
+    print("=" * 60)
+
+
 def main():
     while True:
         print("\nIntelligent Disk Scheduling with Predictive Caching")
-        print("1. Run manual disk scheduling\n2. Run intelligent scheduling\n3. Test predictive caching\n4. Compare all scheduling algorithms\n5. Exit")
-        choice = input("Choose 1-5: ").strip()
-        if choice == "5":
+        print("1. Run manual disk scheduling\n2. Run intelligent scheduling\n3. Test predictive caching\n4. Compare all scheduling algorithms\n5. Compare integrated cache + scheduling modes\n6. Exit")
+        choice = input("Choose 1-6: ").strip()
+        if choice == "6":
             print("Goodbye.")
             return
+        if choice == "5":
+            show_integrated_comparison()
+            continue
         if choice not in {"1", "2", "3", "4"}:
-            print("Choose a menu option from 1 to 5.")
+            print("Choose a menu option from 1 to 6.")
             continue
         tracks, head = settings()
         trace = get_workload(tracks)
@@ -121,4 +156,12 @@ def main():
 
 
 if __name__ == "__main__":
+    _results = compare_modes()
+    _plain = _results["Plain SSTF (no cache)"]
+    _predicted = _results["SSTF + LRU cache + prediction"]
+    if _predicted["hit_rate"] > _plain["hit_rate"] and _predicted["total_head_movement"] <= _plain["total_head_movement"]:
+        print("Sanity checks passed.")
+    else:
+        print("Warning: sanity checks failed -- prediction did not improve over plain SSTF.")
+
     main()
