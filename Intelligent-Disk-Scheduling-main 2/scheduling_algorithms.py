@@ -120,22 +120,50 @@ def scan(requests, head, num_tracks=200, direction="up"):
 
 
 def cscan(requests, head, num_tracks=200, direction="up"):
-    """Circular SCAN: sweep to one edge, wrap to the other, then continue."""
+    """
+    Circular SCAN: like SCAN, but only services requests in one
+    direction. On reaching the physical edge of the disk it jumps back
+    to the far side (without servicing anything on the way) and
+    continues sweeping the same direction. This spreads out wait times
+    more evenly than SCAN, which services on both the outbound and
+    return trip.
+    """
     _validate(requests, head, num_tracks)
     if direction not in ("up", "down"):
         raise ValueError("direction must be 'up' or 'down'")
     left = sorted(t for t in requests if t < head)
     right = sorted(t for t in requests if t >= head)
-    if direction == "up":
-        order = right + left
-        points = right + ([num_tracks - 1, 0] if left else []) + left
-    else:
-        order = list(reversed(left)) + list(reversed(right))
-        points = list(reversed(left)) + ([0, num_tracks - 1] if right else []) + list(reversed(right))
-    movement, current = 0, head
-    for track in points:
+
+    order = []
+    movement = 0
+    current = head
+
+    def visit(track):
+        nonlocal current, movement
         movement += abs(track - current)
         current = track
+
+    if direction == "up":
+        for track in right:
+            visit(track)
+            order.append(track)
+        if left:
+            visit(num_tracks - 1)  # sweep to the far edge
+            visit(0)  # jump back to the start, servicing nothing
+        for track in left:
+            visit(track)
+            order.append(track)
+    else:
+        for track in reversed(left):
+            visit(track)
+            order.append(track)
+        if right:
+            visit(0)  # sweep to the near edge
+            visit(num_tracks - 1)  # jump back to the start, servicing nothing
+        for track in reversed(right):
+            visit(track)
+            order.append(track)
+
     return order, movement
 
 

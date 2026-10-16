@@ -1,4 +1,4 @@
-from scheduling_algorithms import fcfs, sstf, look, scan
+from scheduling_algorithms import fcfs, sstf, look, scan, cscan
 from request_generator import generate_patterned_requests
 
 # The same worked example used in scheduling_algorithms.py's demo block,
@@ -82,18 +82,23 @@ if __name__ == "__main__":
     test_scan_never_beats_look()
     test_scan_never_beats_look_on_random_traces()
     test_smart_algorithms_beat_fcfs_on_this_example()
+    test_cscan_known_movement()
+    test_cscan_services_all_requests()
+    test_invalid_track_and_direction_are_rejected()
     print("All tests passed!")
 
-def test_cscan_services_all_requests_and_has_known_movement():
-    from scheduling_algorithms import cscan
-    order, movement = cscan(REQUESTS, HEAD, NUM_TRACKS)
-    assert sorted(order) == sorted(REQUESTS)
+def test_cscan_known_movement():
+    _, movement = cscan(REQUESTS, HEAD, NUM_TRACKS, direction="up")
     assert movement == 382
+
+
+def test_cscan_services_all_requests():
+    order, _ = cscan(REQUESTS, HEAD, NUM_TRACKS, direction="up")
+    assert sorted(order) == sorted(REQUESTS)  # nothing lost, nothing duplicated
 
 
 def test_invalid_track_and_direction_are_rejected():
     import pytest
-    from scheduling_algorithms import cscan
     with pytest.raises(ValueError):
         fcfs([NUM_TRACKS], HEAD, NUM_TRACKS)
     with pytest.raises(ValueError):
